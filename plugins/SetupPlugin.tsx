@@ -5,7 +5,7 @@ import { $createCodeNode, $isCodeNode, CodeNode, registerCodeHighlighting } from
 import { $convertFromMarkdownString, TRANSFORMERS } from "@lexical/markdown";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { mergeRegister } from "@lexical/utils";
-import { $createTextNode, $getSelection, $isLineBreakNode, COMMAND_PRIORITY_EDITOR, KEY_TAB_COMMAND, LexicalNode, SELECTION_CHANGE_COMMAND } from "lexical";
+import { $createLineBreakNode, $createTextNode, $getSelection, $isLineBreakNode, $isParagraphNode, COMMAND_PRIORITY_EDITOR, KEY_TAB_COMMAND, LexicalNode, ParagraphNode, SELECTION_CHANGE_COMMAND } from "lexical";
 import { useEffect } from "react";
 import { $convertToMarkdownString } from "./ConvertToMarkdown";
 import { $isListItemNode } from "@lexical/list";
@@ -33,12 +33,14 @@ function $getHoveredNode(): LexicalNode | null {
   return nodes[0];
 }
 
-function $isHoveringMarkdown(): boolean {
+
+function $shouldConvert(): boolean {
   const nodes = $getSelection()?.getNodes();
   if (nodes === undefined || nodes?.length === 0) return false;
+  const node = nodes[0];
+  if ($isParagraphNode(node) && node.getChildren().length === 0) return false;
   const parent = nodes[0].getParent();
-  console.log(parent);
-  return parent !== null && $isCodeNode(parent) && (parent as CodeNode).getLanguage() === 'markdown';
+  return !(parent !== null && $isCodeNode(parent) && (parent as CodeNode).getLanguage() === 'markdown');
 }
 
 function $getMarkdownElement(): string | null {
@@ -52,8 +54,7 @@ function $getMarkdownElement(): string | null {
   return $convertToMarkdownString(TRANSFORMERS, parent, true);
 }
 
-function $convertToMarkdownDOM() {
-  console.log("called");
+function $convertToMarkdownDOM() { // BUG: Selection behaves weirdly
   const node = $getHoveredNode();
   const markdown = $getMarkdownElement();
   if (markdown === null) return;
@@ -63,16 +64,17 @@ function $convertToMarkdownDOM() {
   parent.remove();
 }
 
-function pruneMDWrappers(mdNode: MarkdownBlockNode) {
-  const next = mdNode.getNextSibling();
+function pruneMDWrappers(node: MarkdownBlockNode) {
+  const next = node.getNextSibling();
   if (next === null) { // TODO: treat this case
-    const parent = mdNode.getParent();
+    const parent = node.getParent();
     if (parent === null) return;
-    mdNode.getChildren()?.forEach(node => parent.append(node));
+    node.getChildren()?.forEach(node => parent.append(node));
   }
-  mdNode.getChildren()?.forEach(node => next?.insertBefore(node));
-  mdNode.remove();
+  node.getChildren()?.forEach(node => next?.insertBefore(node));
+  node.remove();
 }
+
 
 export function SetupPlugin() {
   const [editor] = useLexicalComposerContext();
@@ -82,13 +84,14 @@ export function SetupPlugin() {
       editor.registerCommand(
         SELECTION_CHANGE_COMMAND,
         () => {
-          if ($isHoveringMarkdown()) return true;
+          console.log("selection");
+          if (!$shouldConvert()) return true;
           $convertToMarkdownDOM();
           return true;
         },
         COMMAND_PRIORITY_EDITOR
       ),
-      editor.registerNodeTransform(MarkdownBlockNode, pruneMDWrappers)
+      editor.registerNodeTransform(MarkdownBlockNode, pruneMDWrappers),
     );
   }, [editor]);
 

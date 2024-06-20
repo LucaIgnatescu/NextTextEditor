@@ -139,7 +139,6 @@ function exportTopLevelElements(
   textTransformersIndex: Array<TextFormatTransformer>,
   textMatchTransformers: Array<TextMatchTransformer>,
 ): string | null {
-  console.log(node);
   for (const transformer of elementTransformers) {
     const result = transformer.export(node, (_node) =>
       exportChildren(_node, textTransformersIndex, textMatchTransformers),
