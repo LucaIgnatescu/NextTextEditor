@@ -1,12 +1,11 @@
 "use client";
 
 import { $createMarkdownBlockNode, MarkdownBlockNode } from "@/nodes/MarkdownBlockNode";
-import { registerCodeHighlighting } from "@lexical/code";
+import { $createCodeNode, $isCodeNode, CodeNode, registerCodeHighlighting } from "@lexical/code";
 import { $convertFromMarkdownString, TRANSFORMERS } from "@lexical/markdown";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import { $wrapNodes } from "@lexical/selection";
 import { mergeRegister } from "@lexical/utils";
-import { $createNodeSelection, $getRoot, $getSelection, $isElementNode, $isLineBreakNode, $splitNode, COMMAND_PRIORITY_CRITICAL, COMMAND_PRIORITY_EDITOR, KEY_ENTER_COMMAND, KEY_TAB_COMMAND, LexicalNode, NodeSelection, SELECTION_CHANGE_COMMAND } from "lexical";
+import { $createTextNode, $getSelection, $isLineBreakNode, COMMAND_PRIORITY_EDITOR, KEY_TAB_COMMAND, LexicalNode, SELECTION_CHANGE_COMMAND } from "lexical";
 import { useEffect } from "react";
 import { $convertToMarkdownString } from "./ConvertToMarkdown";
 import { $isListItemNode } from "@lexical/list";
@@ -28,12 +27,18 @@ function $getAdjacentNodes(node: LexicalNode) {
   return nodes;
 }
 
-function $getLine(): LexicalNode[] {
-  const selection = $getSelection();
-  const nodes = selection?.getNodes();
-  if (nodes === undefined || nodes?.length === 0) return [];
-  const node = nodes[0];
-  return $getAdjacentNodes(node);
+function $getHoveredNode(): LexicalNode | null {
+  const nodes = $getSelection()?.getNodes();
+  if (nodes === undefined || nodes?.length === 0) return null;
+  return nodes[0];
+}
+
+function $isHoveringMarkdown(): boolean {
+  const nodes = $getSelection()?.getNodes();
+  if (nodes === undefined || nodes?.length === 0) return false;
+  const parent = nodes[0].getParent();
+  console.log(parent);
+  return parent !== null && $isCodeNode(parent) && (parent as CodeNode).getLanguage() === 'markdown';
 }
 
 function $getMarkdownElement(): string | null {
@@ -45,6 +50,17 @@ function $getMarkdownElement(): string | null {
   if ($isListItemNode(parent)) parent = parent.getParent();
   //@ts-ignore
   return $convertToMarkdownString(TRANSFORMERS, parent, true);
+}
+
+function $convertToMarkdownDOM() {
+  console.log("called");
+  const node = $getHoveredNode();
+  const markdown = $getMarkdownElement();
+  if (markdown === null) return;
+  const parent = !$isListItemNode(node?.getParent()) ? node?.getParent() : node?.getParent()?.getParent();
+  if (parent === null || parent === undefined) return;
+  parent.insertAfter($createCodeNode('markdown').append($createTextNode(markdown)));
+  parent.remove();
 }
 
 function pruneMDWrappers(mdNode: MarkdownBlockNode) {
@@ -66,19 +82,8 @@ export function SetupPlugin() {
       editor.registerCommand(
         SELECTION_CHANGE_COMMAND,
         () => {
-          const selection = $getSelection();
-          const nodes = selection?.getNodes();
-          if (nodes === undefined || nodes?.length === 0) return true;
-          const node = nodes[0];
-          return true;
-        },
-        COMMAND_PRIORITY_EDITOR
-      ),
-      editor.registerCommand(
-        KEY_TAB_COMMAND,
-        () => {
-          const nodes = $getLine();
-          console.log($getMarkdownElement());
+          if ($isHoveringMarkdown()) return true;
+          $convertToMarkdownDOM();
           return true;
         },
         COMMAND_PRIORITY_EDITOR

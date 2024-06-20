@@ -10,7 +10,6 @@ export function Toolbar({ preserveNewLines }: { preserveNewLines: boolean }) {
   function markdownConverter() {
     const root = $getRoot();
     const firstNode = root.getFirstChild();
-    console.log("converting");
 
     if ($isCodeNode(firstNode) && firstNode.getLanguage() === 'markdown') {
       const markdown = firstNode.getTextContent();
