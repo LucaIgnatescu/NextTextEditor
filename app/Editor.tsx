@@ -1,11 +1,12 @@
 "use client";
 
+import { MarkdownBlockNode } from "@/nodes/MarkdownBlockNode";
 import { SetupPlugin } from "@/plugins/SetupPlugin";
 import { Toolbar } from "@/plugins/Toolbar";
 import { CodeHighlightNode, CodeNode } from "@lexical/code";
 import { LinkNode } from "@lexical/link";
 import { ListItemNode, ListNode } from "@lexical/list";
-import { TRANSFORMERS } from "@lexical/markdown";
+import { $convertFromMarkdownString, TRANSFORMERS } from "@lexical/markdown";
 import { AutoFocusPlugin } from "@lexical/react/LexicalAutoFocusPlugin";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
@@ -27,7 +28,7 @@ export function Editor() {
   const initialConfig = { // TODO: Add initial state
     namespace: "NextEditor",
     theme,
-    nodes: [LinkNode, ListNode, ListItemNode, HorizontalRuleNode, HeadingNode, QuoteNode, CodeNode, CodeHighlightNode],
+    nodes: [MarkdownBlockNode, LinkNode, ListNode, ListItemNode, HorizontalRuleNode, HeadingNode, QuoteNode, CodeNode, CodeHighlightNode],
     onError(error: Error) { console.error(error); }
   };
   return (
