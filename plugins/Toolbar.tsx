@@ -31,6 +31,7 @@ export function Toolbar({ preserveNewLines }: { preserveNewLines: boolean }) {
   return (
     <div>
       <button onClick={() => editor.update(markdownConverter)}>MD</button>
+      <br />
     </div>
   );
 }

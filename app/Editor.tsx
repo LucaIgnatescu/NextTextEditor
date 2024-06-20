@@ -29,7 +29,7 @@ export function Editor() {
     namespace: "NextEditor",
     theme,
     nodes: [MarkdownBlockNode, LinkNode, ListNode, ListItemNode, HorizontalRuleNode, HeadingNode, QuoteNode, CodeNode, CodeHighlightNode],
-    onError(error: Error) { console.error(error); }
+    onError(error: Error) { console.error(error); },
   };
   return (
     <LexicalComposer initialConfig={initialConfig}>

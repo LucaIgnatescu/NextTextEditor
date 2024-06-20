@@ -6,8 +6,10 @@ import { $convertFromMarkdownString, TRANSFORMERS } from "@lexical/markdown";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $wrapNodes } from "@lexical/selection";
 import { mergeRegister } from "@lexical/utils";
-import { $createNodeSelection, $getRoot, $getSelection, $isLineBreakNode, $splitNode, COMMAND_PRIORITY_CRITICAL, COMMAND_PRIORITY_EDITOR, KEY_ENTER_COMMAND, LexicalNode, NodeSelection, SELECTION_CHANGE_COMMAND } from "lexical";
+import { $createNodeSelection, $getRoot, $getSelection, $isElementNode, $isLineBreakNode, $splitNode, COMMAND_PRIORITY_CRITICAL, COMMAND_PRIORITY_EDITOR, KEY_ENTER_COMMAND, KEY_TAB_COMMAND, LexicalNode, NodeSelection, SELECTION_CHANGE_COMMAND } from "lexical";
 import { useEffect } from "react";
+import { $convertToMarkdownString } from "./ConvertToMarkdown";
+import { $isListItemNode } from "@lexical/list";
 
 function $getAdjacentNodes(node: LexicalNode) {
   const nodes = [];
@@ -32,6 +34,17 @@ function $getLine(): LexicalNode[] {
   if (nodes === undefined || nodes?.length === 0) return [];
   const node = nodes[0];
   return $getAdjacentNodes(node);
+}
+
+function $getMarkdownElement(): string | null {
+  const selection = $getSelection();
+  const nodes = selection?.getNodes();
+  if (nodes === undefined || nodes?.length === 0) return null;
+  let parent = nodes[0].getParent();
+  if (parent === null) return null;
+  if ($isListItemNode(parent)) parent = parent.getParent();
+  //@ts-ignore
+  return $convertToMarkdownString(TRANSFORMERS, parent, true);
 }
 
 function pruneMDWrappers(mdNode: MarkdownBlockNode) {
@@ -62,27 +75,39 @@ export function SetupPlugin() {
         COMMAND_PRIORITY_EDITOR
       ),
       editor.registerCommand(
-        KEY_ENTER_COMMAND,
+        KEY_TAB_COMMAND,
         () => {
           const nodes = $getLine();
-          if (nodes.length === 0) return false;
-
-          const selection = $createNodeSelection();
-          nodes.map(node => node.getKey()).forEach(key => selection.add(key));
-          const markdown = selection.getTextContent();
-
-          const root = $getRoot();
-          const mdContainer = $createMarkdownBlockNode();
-          root.append(mdContainer);
-          $convertFromMarkdownString(markdown, TRANSFORMERS, mdContainer);
-          return false;
+          console.log($getMarkdownElement());
+          return true;
         },
-        COMMAND_PRIORITY_CRITICAL
+        COMMAND_PRIORITY_EDITOR
       ),
       editor.registerNodeTransform(MarkdownBlockNode, pruneMDWrappers)
     );
   }, [editor]);
 
+  useEffect(() => editor.update(() => {
+    $convertFromMarkdownString(`# This is a heading
+
+## This is a another heading
+
+This is a paragraph. Many elements are here
+
+This is another paragraph
+
+\`\`\`javascript
+console.log("some code");
+\`\`\`
+
+- List item 1
+- List item 2
+
+1. List item 1
+2. List item 2
+
+Some text with ***bold***.`, TRANSFORMERS, undefined, true);
+  }), [editor]);
 
   return null;
 }
