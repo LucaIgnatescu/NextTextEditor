@@ -1,6 +1,7 @@
 "use client";
 
 import { MarkdownBlockNode } from "@/nodes/MarkdownBlockNode";
+import { LiveConversion } from "@/plugins/LiveConversion";
 import { SetupPlugin } from "@/plugins/SetupPlugin";
 import { Toolbar } from "@/plugins/Toolbar";
 import { CodeHighlightNode, CodeNode } from "@lexical/code";
@@ -45,6 +46,7 @@ export function Editor() {
           <Toolbar preserveNewLines={true} />
 
           <SetupPlugin />
+          <LiveConversion />
           <HistoryPlugin />
           <LinkPlugin />
           <ListPlugin />
