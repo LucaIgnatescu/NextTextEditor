@@ -7,33 +7,13 @@ import { useEffect, useState } from "react";
 import { $isListItemNode } from "@lexical/list";
 import { $convertToMarkdownString } from "./ConvertToMarkdown";
 import { TRANSFORMERS } from "@lexical/markdown";
-class History {
-  states: Array<RangeSelection>;
-  max_capacity: number;
-  constructor(max_capacity = 10, states?: Array<RangeSelection>) {
-    this.max_capacity = max_capacity;
-    this.states = states === undefined ? [] : states;
-  }
-  addEntry(entry: RangeSelection): History {
-    this.states.push(entry);
-    const new_array = this.states.length < this.max_capacity ? this.states.slice() : this.states.slice(-this.max_capacity + 1);
-    return new History(this.max_capacity, new_array);
-  }
-  getLatest(): RangeSelection | undefined {
-    return this.states.at(-1);
-  }
-  isDifferent(entry: RangeSelection): boolean {
-    return this.states.at(-1)?.anchor.key !== entry.anchor.key;
-  }
-}
+
 
 function $getHoveredNode(): LexicalNode | null {
   const nodes = $getSelection()?.getNodes();
   if (nodes === undefined || nodes?.length === 0) return null;
   return nodes[0];
 }
-
-
 
 function $isConvertible(): boolean {
   const nodes = $getSelection()?.getNodes();
@@ -65,19 +45,39 @@ function $convertToMarkdownDOM() {
   parent.remove();
 }
 
+function $restoreText(node: CodeNode) {
+  console.log(node);
+  console.log(node.getTextContent());
+  return;
+}
+
+function $getCodeParent(node: LexicalNode | null): CodeNode | null {
+  let temp = node;
+  while (temp !== null && !$isCodeNode(temp)) {
+    temp = temp.getParent();
+  }
+  if (!$isCodeNode(temp)) return null;
+  return temp;
+}
+
 export function LiveConversion() {
   const [editor] = useLexicalComposerContext();
-  const [history, setHistory] = useState(new History());
+  const [history, setHistory] = useState<null | CodeNode>(null);
   useEffect(() =>
     editor.registerCommand(
       SELECTION_CHANGE_COMMAND,
       () => {
-        console.log(history);
-        const selection = $getSelection() as RangeSelection | null;
-        if (selection === null) return true;
-        if (history.isDifferent(selection)) setHistory(history.addEntry(selection));
+        const codeParent = $getCodeParent($getHoveredNode());
+        if (history === null || history.getKey() !== codeParent?.getKey()) {
+          if (history !== null) {
+            $restoreText(history);
+          }
+          console.log("changing history");
+          setHistory(codeParent);
+        }
         if (!$isConvertible()) return true;
-        $convertToMarkdownDOM();
+        editor.update($convertToMarkdownDOM);
+        // $convertToMarkdownDOM();
         return true;
       },
       COMMAND_PRIORITY_EDITOR
