@@ -1,12 +1,13 @@
 "use client";
 
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import { $createTextNode, $getSelection, $isParagraphNode, COMMAND_PRIORITY_EDITOR, LexicalNode, RangeSelection, SELECTION_CHANGE_COMMAND } from "lexical";
+import { $createTextNode, $getSelection, $isParagraphNode, $setSelection, COMMAND_PRIORITY_CRITICAL, COMMAND_PRIORITY_EDITOR, LexicalNode, SELECTION_CHANGE_COMMAND } from "lexical";
 import { $createCodeNode, $isCodeNode, CodeNode } from "@lexical/code";
 import { useEffect, useState } from "react";
 import { $isListItemNode } from "@lexical/list";
 import { $convertToMarkdownString } from "./ConvertToMarkdown";
-import { TRANSFORMERS } from "@lexical/markdown";
+import { $convertFromMarkdownString, TRANSFORMERS } from "@lexical/markdown";
+import { $createMarkdownBlockNode } from "@/nodes/MarkdownBlockNode";
 
 
 function $getHoveredNode(): LexicalNode | null {
@@ -38,16 +39,21 @@ function $getMarkdownElement(): string | null {
 function $convertToMarkdownDOM() {
   const node = $getHoveredNode();
   const markdown = $getMarkdownElement();
-  if (markdown === null) return;
+  if (markdown === null) return null;
   const parent = !$isListItemNode(node?.getParent()) ? node?.getParent() : node?.getParent()?.getParent();
-  if (parent === null || parent === undefined) return;
-  parent.insertAfter($createCodeNode('markdown').append($createTextNode(markdown)));
+  if (parent === null || parent === undefined) return null;
+  const codeNode = $createCodeNode('markdown').append($createTextNode(markdown));
+  parent.insertAfter(codeNode);
   parent.remove();
+  return codeNode;
 }
 
 function $restoreText(node: CodeNode) {
-  console.log(node);
-  console.log(node.getTextContent());
+  const markdown = node.getTextContent();
+  const temp = $createMarkdownBlockNode();
+  node.insertAfter(temp);
+  $convertFromMarkdownString(markdown, TRANSFORMERS, temp, true);
+  node.remove();
   return;
 }
 
@@ -63,24 +69,28 @@ function $getCodeParent(node: LexicalNode | null): CodeNode | null {
 export function LiveConversion() {
   const [editor] = useLexicalComposerContext();
   const [history, setHistory] = useState<null | CodeNode>(null);
+
+
   useEffect(() =>
     editor.registerCommand(
       SELECTION_CHANGE_COMMAND,
       () => {
-        const codeParent = $getCodeParent($getHoveredNode());
-        if (history === null || history.getKey() !== codeParent?.getKey()) {
-          if (history !== null) {
-            $restoreText(history);
-          }
-          console.log("changing history");
-          setHistory(codeParent);
-        }
+        console.log($getHoveredNode(), history);
         if (!$isConvertible()) return true;
-        editor.update($convertToMarkdownDOM);
-        // $convertToMarkdownDOM();
+        editor.update(() => {
+          const codeParent = $convertToMarkdownDOM();
+          if (codeParent === null) return;
+          if (history === null || history.getKey() !== codeParent?.getKey()) {
+            if (history !== null) {
+              $restoreText(history);
+            }
+            setHistory(codeParent);
+          }
+          $setSelection(null);
+        });
         return true;
       },
-      COMMAND_PRIORITY_EDITOR
+      COMMAND_PRIORITY_CRITICAL
     ), [editor, history]);
   return null;
 }
