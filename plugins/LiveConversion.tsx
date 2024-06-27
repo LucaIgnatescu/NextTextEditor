@@ -1,13 +1,15 @@
 "use client";
 
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import { $createTextNode, $getSelection, $isParagraphNode, $setSelection, COMMAND_PRIORITY_CRITICAL, COMMAND_PRIORITY_EDITOR, COMMAND_PRIORITY_NORMAL, LexicalNode, SELECTION_CHANGE_COMMAND } from "lexical";
+import { $createTextNode, $getRoot, $getSelection, $isParagraphNode, $setSelection, COMMAND_PRIORITY_CRITICAL, COMMAND_PRIORITY_NORMAL, KEY_ESCAPE_COMMAND, LexicalNode, SELECTION_CHANGE_COMMAND } from "lexical";
 import { $createCodeNode, $isCodeNode, CodeNode } from "@lexical/code";
 import { useEffect, useState } from "react";
 import { $isListItemNode } from "@lexical/list";
 import { $convertToMarkdownString } from "./ConvertToMarkdown";
 import { $convertFromMarkdownString, TRANSFORMERS } from "@lexical/markdown";
 import { $createMarkdownBlockNode } from "@/nodes/MarkdownBlockNode";
+import { mergeRegister } from "@lexical/utils";
+import { SAVE_COMMAND } from "./SetupPlugin";
 
 
 function $getHoveredNode(): LexicalNode | null {
@@ -48,7 +50,7 @@ function $convertToMarkdownDOM() {
   return codeNode;
 }
 
-function restoreText(node: CodeNode) {
+function $restoreText(node: CodeNode) {
   const markdown = node.getTextContent();
   const temp = $createMarkdownBlockNode();
   node.insertAfter(temp);
@@ -57,32 +59,55 @@ function restoreText(node: CodeNode) {
   return;
 }
 
+export function $restoreDOM() { // NOTE: Assumes markdown block is always a direct child of root
+  const root = $getRoot();
+  for (const node of root.getChildren()) {
+    if ($isCodeNode(node) && (node as CodeNode).getLanguage() === 'markdown') {
+      $restoreText(node);
+    }
+  }
+}
+
 export function LiveConversion() {
   const [editor] = useLexicalComposerContext();
   const [history, setHistory] = useState<null | CodeNode>(null);
 
-
   useEffect(() =>
-    editor.registerCommand(
-      SELECTION_CHANGE_COMMAND,
-      () => {
-        if (!$isConvertible()) return true;
-        editor.update(() => {
-          const codeParent = $convertToMarkdownDOM();
-          if (codeParent === null) return;
-          if (history === null || history.getKey() !== codeParent?.getKey()) {
-            if (history !== null) {
-              restoreText(history);
+    mergeRegister(
+      editor.registerCommand(
+        SELECTION_CHANGE_COMMAND,
+        () => {
+          if (!$isConvertible()) return true;
+          editor.update(() => {
+            console.log("running selection handler");
+            const codeParent = $convertToMarkdownDOM();
+            if (codeParent === null) return;
+            if (history === null || history.getKey() !== codeParent?.getKey()) {
+              if (history !== null) {
+                $restoreText(history);
+              }
+              setHistory(codeParent);
             }
-            setHistory(codeParent);
-          }
-          $setSelection(null);
-        });
-        const state = editor.getEditorState().toJSON();
-        console.log(state);
-        return true;
-      },
-      COMMAND_PRIORITY_NORMAL
+            $setSelection(null);
+          });
+          const state = editor.getEditorState().toJSON();
+          return true;
+        },
+        COMMAND_PRIORITY_NORMAL
+      ),
+      editor.registerCommand(
+        KEY_ESCAPE_COMMAND,
+        () => {
+          editor.update(() => {
+            $restoreDOM();
+            setHistory(null);
+            $setSelection(null);
+            editor.dispatchCommand(SAVE_COMMAND, null);
+          });
+          return true;
+        },
+        COMMAND_PRIORITY_NORMAL
+      ),
     ), [editor, history]);
   return null;
 }

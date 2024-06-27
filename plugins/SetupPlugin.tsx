@@ -6,8 +6,9 @@ import { registerCodeHighlighting } from "@lexical/code";
 import { $convertFromMarkdownString, TRANSFORMERS } from "@lexical/markdown";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { mergeRegister } from "@lexical/utils";
-import { $setSelection, COMMAND_PRIORITY_CRITICAL, COMMAND_PRIORITY_EDITOR, EditorState, KEY_ESCAPE_COMMAND } from "lexical";
+import { $setSelection, COMMAND_PRIORITY_CRITICAL, COMMAND_PRIORITY_EDITOR, COMMAND_PRIORITY_LOW, EditorState, KEY_ESCAPE_COMMAND, LexicalCommand, createCommand } from "lexical";
 import { useEffect } from "react";
+import { $restoreDOM } from "./LiveConversion";
 
 
 function pruneMDWrappers(node: MarkdownBlockNode) {
@@ -21,6 +22,8 @@ function pruneMDWrappers(node: MarkdownBlockNode) {
   node.remove();
 }
 
+export const SAVE_COMMAND: LexicalCommand<null> = createCommand();
+
 
 export function SetupPlugin() {
   const [editor] = useLexicalComposerContext();
@@ -30,11 +33,9 @@ export function SetupPlugin() {
       registerCodeHighlighting(editor),
       editor.registerNodeTransform(MarkdownBlockNode, pruneMDWrappers),
       editor.registerCommand(
-        KEY_ESCAPE_COMMAND,
-        () => {
-          $setSelection(null);
-          const state = JSON.stringify(editor.getEditorState().toJSON());
-          save(state);
+        SAVE_COMMAND,
+        () => {// TODO: implement
+          console.log('saving');
           return true;
         },
         COMMAND_PRIORITY_CRITICAL
