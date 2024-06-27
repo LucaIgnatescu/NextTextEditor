@@ -1,7 +1,7 @@
 "use client";
 
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import { $createTextNode, $getSelection, $isParagraphNode, $setSelection, COMMAND_PRIORITY_CRITICAL, COMMAND_PRIORITY_EDITOR, LexicalNode, SELECTION_CHANGE_COMMAND } from "lexical";
+import { $createTextNode, $getSelection, $isParagraphNode, $setSelection, COMMAND_PRIORITY_CRITICAL, COMMAND_PRIORITY_EDITOR, COMMAND_PRIORITY_NORMAL, LexicalNode, SELECTION_CHANGE_COMMAND } from "lexical";
 import { $createCodeNode, $isCodeNode, CodeNode } from "@lexical/code";
 import { useEffect, useState } from "react";
 import { $isListItemNode } from "@lexical/list";
@@ -48,22 +48,13 @@ function $convertToMarkdownDOM() {
   return codeNode;
 }
 
-function $restoreText(node: CodeNode) {
+function restoreText(node: CodeNode) {
   const markdown = node.getTextContent();
   const temp = $createMarkdownBlockNode();
   node.insertAfter(temp);
   $convertFromMarkdownString(markdown, TRANSFORMERS, temp, true);
   node.remove();
   return;
-}
-
-function $getCodeParent(node: LexicalNode | null): CodeNode | null {
-  let temp = node;
-  while (temp !== null && !$isCodeNode(temp)) {
-    temp = temp.getParent();
-  }
-  if (!$isCodeNode(temp)) return null;
-  return temp;
 }
 
 export function LiveConversion() {
@@ -75,22 +66,23 @@ export function LiveConversion() {
     editor.registerCommand(
       SELECTION_CHANGE_COMMAND,
       () => {
-        console.log($getHoveredNode(), history);
         if (!$isConvertible()) return true;
         editor.update(() => {
           const codeParent = $convertToMarkdownDOM();
           if (codeParent === null) return;
           if (history === null || history.getKey() !== codeParent?.getKey()) {
             if (history !== null) {
-              $restoreText(history);
+              restoreText(history);
             }
             setHistory(codeParent);
           }
           $setSelection(null);
         });
+        const state = editor.getEditorState().toJSON();
+        console.log(state);
         return true;
       },
-      COMMAND_PRIORITY_CRITICAL
+      COMMAND_PRIORITY_NORMAL
     ), [editor, history]);
   return null;
 }
